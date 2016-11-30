@@ -1,199 +1,211 @@
-import twitter
 import csv
 import json
-import requests
 import ast
 import re
 import time
+import requests
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from nltk import tokenize
-from common import *
+import twitter
 
 #-------------------------------------------------------#
+
 
 def compute_sentiment_score(data):
-	' Returns the average sentiment score of all sentences in the tweet '
+    ''' Returns the average sentiment score of all sentences in the tweet '''
 
-	sentences = tokenize.sent_tokenize(data)
+    sentences = tokenize.sent_tokenize(data)
 
-	sid = SentimentIntensityAnalyzer()
+    sid = SentimentIntensityAnalyzer()
 
-	compounds = 0.0000
-	for sentence in sentences:
-		ss = sid.polarity_scores(sentence)
-		compounds += ss['compound']
+    compounds = 0.0000
+    for sentence in sentences:
+        polarity = sid.polarity_scores(sentence)
+        compounds += polarity['compound']
 
-	avg_comp = (compounds*100)/len(sentences)
+    avg_comp = (compounds * 100) / len(sentences)
 
-	if avg_comp >= 60:
-		return 2
+    if avg_comp >= 60:
+        return 2
 
-	elif avg_comp >= 20:
-		return 1
+    elif avg_comp >= 20:
+        return 1
 
-	elif avg_comp <= -60:
-		return -2
+    elif avg_comp <= -60:
+        return -2
 
-	elif avg_comp <= -20:
-		return -1
+    elif avg_comp <= -20:
+        return -1
 
-	else:
-		return 0
+    else:
+        return 0
 
 #-------------------------------------------------------#
+
 
 def filter_tweets(tweets):
-	' Filters the status for specific target values from all statuses '
-	
-	utweets = []
+    ''' Filters the status for specific target values from all statuses '''
 
-	for twt in tweets:
-		twt = twt.AsDict()
-		utwt = {}
+    utweets = []
 
-		utwt['date_of_twt'] = twt['created_at'].encode('utf-8')
-		utwt['id'] = twt['id_str'].encode('utf-8')
-		utwt['text'] = twt['text'].encode('utf-8')
-		utwt['lang'] = twt['lang'].encode('utf-8')
+    for twt in tweets:
+        twt = twt.AsDict()
+        utwt = {}
 
-		# filter source
-		utwt['source'] = (re.sub('<[^>]*>', '', twt['source'])).encode('utf-8')
-		utwt['retweet_status'] = False
-		
-		utwt['reply_to_name'] = ''.encode('utf-8')
-                utwt['reply_to_id'] = ''.encode('utf-8')
-		if twt['user_mentions']:
-			utwt['reply_to_name'] = twt['user_mentions'][0]['screen_name'].encode('utf-8')
-			utwt['reply_to_id'] = twt['user_mentions'][0]['id']
+        utwt['date_of_twt'] = twt['created_at'].encode('utf-8')
+        utwt['id'] = twt['id_str'].encode('utf-8')
+        utwt['text'] = twt['text'].encode('utf-8')
+        utwt['lang'] = twt['lang'].encode('utf-8')
 
-		utweets.append(utwt)
+        # filter source
+        utwt['source'] = (re.sub('<[^>]*>', '', twt['source'])).encode('utf-8')
+        utwt['retweet_status'] = False
 
-	return utweets
+        utwt['reply_to_name'] = ''.encode('utf-8')
+        utwt['reply_to_id'] = ''.encode('utf-8')
+        if twt['user_mentions']:
+            utwt['reply_to_name'] = twt['user_mentions'][
+                0]['screen_name'].encode('utf-8')
+            utwt['reply_to_id'] = twt['user_mentions'][0]['id']
+
+        utweets.append(utwt)
+
+    return utweets
 
 #-------------------------------------------------------#
+
 
 def get_name_tweets(uname):
-	' Returns all tweets by specified user. If user name not provided, then an empty list is returned '
-	
-	utweets = []
-	lis = []
+    ''' Returns all tweets by specified user. If user name not provided, then an empty list is returned '''
 
-	first_twt_id = [twt.AsDict()['id'] for twt in api.GetUserTimeline(screen_name=uname, count=1)]
-	lis.append(first_twt_id[0])
+    utweets = []
+    lis = []
 
-	if uname:
-		for i in xrange(16):
-			user_tweets = api.GetUserTimeline(screen_name=uname, count=200, include_rts=False, max_id=lis[-1])
+    first_twt_id = [twt.AsDict()['id']
+                    for twt in api.GetUserTimeline(screen_name=uname, count=1)]
+    lis.append(first_twt_id[0])
 
-			for twt in user_tweets:
-				utweets.append(twt)
-				lis.append(twt.AsDict()['id'])
+    if uname:
+        for i in xrange(16):
+            user_tweets = api.GetUserTimeline(
+                screen_name=uname, count=200, include_rts=False, max_id=lis[-1])
 
-		utweets = filter_tweets(utweets)
+            for twt in user_tweets:
+                utweets.append(twt)
+                lis.append(twt.AsDict()['id'])
 
-	return utweets
+        utweets = filter_tweets(utweets)
+
+    return utweets
 
 #-------------------------------------------------------#
+
 
 def get_hashtag_tweets(search_tag):
-	' Returns all statuses containing specified hashtag. If search hashtag is not provided, then an empty list is returned '
+    ''' Returns all statuses containing specified hashtag. If search hashtag is not provided, then an empty list is returned '''
 
-	hashtag_tweets = []
-	lis = []
+    hashtag_tweets = []
+    lis = []
 
-        first_twt_id = [twt.AsDict()['id'] for twt in api.GetSearch(raw_query='q=%23'+search_tag, count=1)]
-        lis.append(first_twt_id[0])
+    first_twt_id = [twt.AsDict()['id'] for twt in api.GetSearch(
+        raw_query='q=%23' + search_tag, count=1)]
+    lis.append(first_twt_id[0])
 
-	if search_tag:
-		for i in xrange(16):
-                        t_tweets = api.GetSearch(raw_query='q=%23'+search_tag, count=200, max_id=lis[-1])
+    if search_tag:
+        for i in xrange(16):
+            t_tweets = api.GetSearch(
+                raw_query='q=%23' + search_tag, count=200, max_id=lis[-1])
 
-                        for twt in t_tweets:
-                                hashtag_tweets.append(twt)
-                                lis.append(twt.AsDict()['id'])
+            for twt in t_tweets:
+                hashtag_tweets.append(twt)
+                lis.append(twt.AsDict()['id'])
 
-		hashtag_tweets = filter_tweets(hashtag_tweets)
+        hashtag_tweets = filter_tweets(hashtag_tweets)
 
-	return hashtag_tweets
+    return hashtag_tweets
 
 #-------------------------------------------------------#
 
+
 def get_mention_tweets(uname):
-	' Returns all mentions of specified user. If user name not provided, then an empty list is returned '
-	
-	mention_tweets = []
-	lis = []
-        
-        first_twt_id = [twt.AsDict()['id'] for twt in api.GetSearch(raw_query='q=%40'+uname, count=1)]
-        lis.append(first_twt_id[0])
-	
-	if uname:
-		for i in xrange(16):
-                        m_tweets = api.GetSearch(raw_query='q=%40'+uname, count=200, max_id=lis[-1])
-                
-                        for twt in m_tweets:
-                                mention_tweets.append(twt)
-                                lis.append(twt.AsDict()['id'])
+    ''' Returns all mentions of specified user. If user name not provided, then an empty list is returned '''
 
-		mention_tweets = filter_tweets(mention_tweets)
+    mention_tweets = []
+    lis = []
 
-	return mention_tweets
+    first_twt_id = [twt.AsDict()['id']
+                    for twt in api.GetSearch(raw_query='q=%40' + uname, count=1)]
+    lis.append(first_twt_id[0])
+
+    if uname:
+        for i in xrange(16):
+            m_tweets = api.GetSearch(
+                raw_query='q=%40' + uname, count=200, max_id=lis[-1])
+
+            for twt in m_tweets:
+                mention_tweets.append(twt)
+                lis.append(twt.AsDict()['id'])
+
+        mention_tweets = filter_tweets(mention_tweets)
+
+    return mention_tweets
 
 
 #-------------------------------------------------------#
 
 def create_csv(uname, tweets, ftype=''):
-	' Creates a csv file '
+    ''' Creates a csv file '''
 
-	f = open(ftype+'realDonaldTrump_sentiment_analysis.csv', 'w')
-	writer = csv.writer(f)
+    f = open(ftype + 'realDonaldTrump_sentiment_analysis.csv', 'w')
+    writer = csv.writer(f)
 
-	writer.writerow([
-		'Name', 'Twitter Handle', 'Total Tweets', 'Total Followings', 'Total Followers', 'User ID', 'User Verified', 'User Location',
-		'User Description', 'Date of Tweet', 'Tweet ID', 'Tweet Text', 'Tweet Language', 'Tweet Source', 'Tweet Retweet Status',
-		'Tweet Reply To Name', 'Tweet Reply To ID', 'Sentiment Score'
-	])
-	
-	user_info = api.GetUser(screen_name=uname).AsDict()
+    writer.writerow([
+        'Name', 'Twitter Handle', 'Total Tweets', 'Total Followings', 'Total Followers', 'User ID', 'User Verified', 'User Location',
+        'User Description', 'Date of Tweet', 'Tweet ID', 'Tweet Text', 'Tweet Language', 'Tweet Source', 'Tweet Retweet Status',
+        'Tweet Reply To Name', 'Tweet Reply To ID', 'Sentiment Score'
+    ])
 
-        name = user_info['name'].encode('utf-8')
-        twitter_handle = uname.encode('utf-8')
-        total_twt = user_info['statuses_count']
-        total_followings = user_info['friends_count']
-        total_followers = user_info['followers_count']
-        user_id = user_info['id']
-        verified = user_info['verified']
-        location = user_info['location'].encode('utf-8')
-        desc = user_info['description'].encode('utf-8')
+    user_info = api.GetUser(screen_name=uname).AsDict()
 
-	for twt in tweets:
-		writer.writerow([
-			name, twitter_handle, total_twt, total_followings, total_followers, user_id, verified, location, desc,
-			twt['date_of_twt'], twt['id'], twt['text'], twt['lang'], twt['source'], twt['retweet_status'], twt['reply_to_name'],
-			twt['reply_to_id'], twt['sentiment_score']
-		])
+    name = user_info['name'].encode('utf-8')
+    twitter_handle = uname.encode('utf-8')
+    total_twt = user_info['statuses_count']
+    total_followings = user_info['friends_count']
+    total_followers = user_info['followers_count']
+    user_id = user_info['id']
+    verified = user_info['verified']
+    location = user_info['location'].encode('utf-8')
+    desc = user_info['description'].encode('utf-8')
+
+    for twt in tweets:
+        writer.writerow([
+            name, twitter_handle, total_twt, total_followings, total_followers, user_id, verified, location, desc,
+            twt['date_of_twt'], twt['id'], twt['text'], twt['lang'], twt[
+                'source'], twt['retweet_status'], twt['reply_to_name'],
+            twt['reply_to_id'], twt['sentiment_score']
+        ])
 
 #-------------------------------------------------------#
-	
-if __name__=='__main__':
-        # initialize twitter api
-        with open('config.json') as f:
-                config = json.load(f)
 
-        api = twitter.Api(consumer_key=config['consumer_key'], consumer_secret=config['consumer_secret'],
-                              access_token_key=config['access_token_key'], access_token_secret=config['access_token_secret'])
+if __name__ == '__main__':
+    # initialize twitter api
+    with open('config.json') as f:
+        config = json.load(f)
 
-	# set screen name
-	screen_name = 'realDonaldTrump'
+    api = twitter.Api(consumer_key=config['consumer_key'], consumer_secret=config['consumer_secret'],
+                      access_token_key=config['access_token_key'], access_token_secret=config['access_token_secret'])
 
-	user_tweets = get_name_tweets(screen_name)
-	create_csv(screen_name, user_tweets)
-	print "realDonaldTrump_sentiment_analysis.csv created!"
+    # set screen name
+    screen_name = 'realDonaldTrump'
 
-	hash_tweets = get_hashtag_tweets(screen_name)
-	create_csv(screen_name, hash_tweets, ftype='#')
-	print "#realDonaldTrump_sentiment_analysis.csv created!"
+    user_tweets = get_name_tweets(screen_name)
+    create_csv(screen_name, user_tweets)
+    print "realDonaldTrump_sentiment_analysis.csv created!"
 
-	mention_tweets = get_mention_tweets(screen_name)
-	create_csv(screen_name, mention_tweets, ftype='@')
-	print "@realDonaldTrump_sentiment_analysis.csv created!"
+    hash_tweets = get_hashtag_tweets(screen_name)
+    create_csv(screen_name, hash_tweets, ftype='#')
+    print "#realDonaldTrump_sentiment_analysis.csv created!"
+
+    mention_tweets = get_mention_tweets(screen_name)
+    create_csv(screen_name, mention_tweets, ftype='@')
+    print "@realDonaldTrump_sentiment_analysis.csv created!"

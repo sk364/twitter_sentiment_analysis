@@ -9,6 +9,14 @@ Run the following command with root privileges to install all dependencies
 
 pip install -r requirements.txt
 
+Then you will be needing to install nltk's data
+
+In the python interpreter, run the following command
+
+>> import nltk
+
+>> nltk.download()
+
 # Run the Code
 
 python tweet.py

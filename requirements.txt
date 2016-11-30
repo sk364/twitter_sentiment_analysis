@@ -1,0 +1,5 @@
+python-twitter
+requests
+nltk
+json
+csv
